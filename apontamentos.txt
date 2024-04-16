@@ -1,0 +1,7 @@
+ROBOTICA APOMTAMENTOS 
+------------------------------------------------------------
+WEEK 1: done
+WEEK 2:
+
+input: readings do lidar (array de tuplos de coordenadas)
+outpu: par velocidade linear/velocidade angular
