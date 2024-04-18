@@ -11,6 +11,3 @@ TODO:
   (pode ser através de um numero de areas ou um valor continuo que vem diretamente da distancia ao target)
 input: readings do lidar (array de tuplos de coordenadas)
 outpu: par velocidade linear/velocidade angular
-
-ppossiveis maneiras de funçao heurística:
-
