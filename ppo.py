@@ -42,7 +42,7 @@ class Environment:
 
 def compute_rewards(dist_sensors, gps, TARGET):
     reward = 0
-    if reached_target(TARGET):
+    if reached_target(gps, TARGET):
         reward += 10  # Reward for reaching the target
     if collision_detected(dist_sensors):
         reward -= 5  # Penalty for collision

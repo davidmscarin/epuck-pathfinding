@@ -29,7 +29,7 @@ def getGPS(robot, timestep):
 def getLidar(robot, timestep):
     lidar = robot.getLidar('lidar')
     lidar.enable(timestep)
-    lidar.enablePointCloud(timestep)
+    lidar.enablePointCloud()
     return lidar
 
 def collision_detected(dist_sensors):
