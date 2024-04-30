@@ -1,5 +1,5 @@
 from controller import Robot, DistanceSensor
-from controllers.utils import cmd_vel
+from utils import cmd_vel
 
 # Create the Robot instance.
 robot: Robot = Robot()
