@@ -8,6 +8,7 @@ def get_initial_coordinates():
     else:
         y = np.random.choice([0.1,1.9])
         x = np.random.randint(1,19)/10
+    return x,y
 
 def collision_detected(dist_sensors):
     THRESHOLD = 500

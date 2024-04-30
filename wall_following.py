@@ -16,6 +16,11 @@ def getDistSensors():
         sensors.append(ds)
     return sensors
 
+def obstacle_detected(dist_sensors):
+    THRESHOLD = 500
+    if max(dist_sensors, key=lambda x: x.getValue()).getValue() > THRESHOLD:
+        return True
+    return False
 
 def controller():
     dist_sensors: [DistanceSensor] = getDistSensors()
