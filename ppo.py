@@ -3,13 +3,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
 from controller import Robot, Supervisor, LidarPoint
-from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud
+from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor
 from utils import cmd_vel, warp_robot
 import numpy as np
 
 robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())
 TARGET = [1.000, 1.000]
+N_DIV = 8
 
 class PPO(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -49,7 +50,7 @@ def compute_rewards(dist_sensors, gps, TARGET):
     return reward
 
 def train():
-    input_dim = 402  # Example: number of LIDAR readings
+    input_dim = N_DIV*2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
     model = PPO(input_dim, output_dim)
     optimizer = optim.Adam(model.parameters(), lr=0.01)
@@ -66,18 +67,15 @@ def train():
         environment.reset()
         total_reward = 0
         for t in range(max_timesteps):
-            readings = getPointCloud(lidar_sensors)
-            print(readings)
-            print(len(readings))
-            state_tensor = torch.FloatTensor(readings)
-            print(state_tensor)
-            print(state_tensor.shape)
+            readingsX, readingsY = getPointCloud(lidar_sensors)
+            state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
             action_distribution = model.forward(state_tensor)
             action = action_distribution.sample()
+            print(action)
             environment.step(action.numpy())
             reward = compute_rewards(dist_sensors, gps, TARGET)
             total_reward += reward
-            if reward>=10:
+            if reward >= 10:
                 break
         print(f"Episode {episode}, Total Reward: {total_reward}")
 

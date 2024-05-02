@@ -60,14 +60,14 @@ def getTensor(readingsX, readingsY, n_div):
     for j in range(n_div):
         sumX = 0
         sumY = 0
-        for i in range(len(readingsX)/n_div):
-            sumX += readingsX[j*i]
-            sumY += readingsY[j*i]
+        for i in range(len(readingsX)//n_div):
+            if not math.isinf(readingsX[j*i]):
+                sumX += readingsX[j*i]
+            if not math.isinf(readingsX[j*i]):
+                sumY += readingsY[j * i]
         tensor.append(sumX/n_div)
         tensor.append(sumY/n_div)
     return tensor
-
-
 
 
 
