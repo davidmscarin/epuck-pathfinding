@@ -66,14 +66,12 @@ def train():
         environment.reset()
         total_reward = 0
         for t in range(max_timesteps):
-            readings = []
-            point_cloud = getPointCloud(lidar_sensors)
-            for point in point_cloud:
-                x = point.x
-                y = point.y
-                readings.append(x)
-                readings.append(y)
+            readings = getPointCloud(lidar_sensors)
+            print(readings)
+            print(len(readings))
             state_tensor = torch.FloatTensor(readings)
+            print(state_tensor)
+            print(state_tensor.shape)
             action_distribution = model.forward(state_tensor)
             action = action_distribution.sample()
             environment.step(action.numpy())

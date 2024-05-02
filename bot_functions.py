@@ -1,4 +1,4 @@
-from controller import Robot, DistanceSensor
+from controller import Robot, DistanceSensor, Lidar
 import numpy as np
 import math
 from utils import cmd_vel
@@ -27,7 +27,7 @@ def getGPS(robot, timestep):
     return gps
 
 def getLidar(robot, timestep):
-    lidar = robot.getLidar('lidar')
+    lidar = Lidar('lidar')
     lidar.enable(timestep)
     lidar.enablePointCloud()
     return lidar
@@ -45,5 +45,30 @@ def reached_target(gps, target):
     return False
 
 def getPointCloud(lidar):
-    readings = lidar.getPointCloud()
-    return readings
+    point_cloud = lidar.getPointCloud()
+    readingsX = []
+    readingsY = []
+    for point in point_cloud:
+        x = point.x
+        y = point.y
+        readingsX.append(x)
+        readingsY.append(y)
+    return readingsX[:-1], readingsY[:-1]
+
+def getTensor(readingsX, readingsY, n_div):
+    tensor = []
+    for j in range(n_div):
+        sumX = 0
+        sumY = 0
+        for i in range(len(readingsX)/n_div):
+            sumX += readingsX[j*i]
+            sumY += readingsY[j*i]
+        tensor.append(sumX/n_div)
+        tensor.append(sumY/n_div)
+    return tensor
+
+
+
+
+
+
