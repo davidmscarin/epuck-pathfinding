@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
 from controller import Robot, Supervisor, LidarPoint
-from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor
+from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist
 from utils import cmd_vel, warp_robot
 import numpy as np
 
@@ -47,6 +47,12 @@ def compute_rewards(dist_sensors, gps, TARGET):
         reward += 10  # Reward for reaching the target
     if collision_detected(dist_sensors):
         reward -= 5  # Penalty for collision
+    init_dist = euclidean_dist(gps, TARGET)
+    
+    final_dist = euclidean_dist(gps,TARGET)
+    target_dist_gain = final_dist - init_dist
+    # total_reward += ...
+
     return reward
 
 def train():
@@ -75,8 +81,9 @@ def train():
             environment.step(action.numpy())
             reward = compute_rewards(dist_sensors, gps, TARGET)
             total_reward += reward
-            if reward >= 10:
+            if collision_detected(dist_sensors) or reached_target(gps,target):
                 break
+
         print(f"Episode {episode}, Total Reward: {total_reward}")
 
 if __name__ == "__main__":
