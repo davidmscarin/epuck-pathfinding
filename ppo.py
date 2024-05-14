@@ -9,6 +9,7 @@ import numpy as np
 
 robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())
+print(timestep)
 TARGET = [1.000, 1.000]
 N_DIV = 8
 
@@ -40,19 +41,23 @@ class Environment:
         lin_vel, ang_vel = action
         cmd_vel(self.robot, lin_vel, ang_vel)
         robot.step()
-def compute_rewards(init_dist, dist_sensors, gps, TARGET):
+def compute_rewards(TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
     reward = 0
     if reached_target(gps, TARGET):
         reward += 10  # Reward for reaching the target
     if collision_detected(dist_sensors):
         reward -= 5  # Penalty for collision
 
-    final_dist = euclidean_dist(gps, TARGET)
-    target_dist_gain = init_dist - final_dist  # Calculating the distance gain
-    reward += 10 * target_dist_gain  # Reward for getting closer to target
+    if get_dist:
+        dist = compute_dist(init_dist, gps, TARGET)
+        reward = 10 * dist
 
     return reward
 
+def compute_dist(init_dist, gps, TARGET):
+    final_dist = euclidean_dist(gps, TARGET)
+    target_dist_gain = init_dist - final_dist  # Calculating the distance gain
+    return target_dist_gain
 
 def compute_ppo_loss(log_probs, advantages, epsilon):
     # Convert advantages to tensor
@@ -85,12 +90,13 @@ def discount_rewards(rewards, gamma):
 def train():
     input_dim = N_DIV * 2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
-    model = PPO(input_dim, output_dim)  # Assuming PPO is your policy network
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
+    model = PPO(input_dim, output_dim)
+    optimizer = optim.Adam(model.parameters(), lr=0.05)
 
     environment = Environment(robot)
     num_episodes = 1000
-    max_timesteps = 200 * timestep
+    #max_timesteps = 200 * timestep
+    max_timesteps = 20
     gps = getGPS(robot, timestep)
     dist_sensors = getDistSensors(robot, timestep)
     lidar_sensors = getLidar(robot, timestep)
@@ -104,26 +110,40 @@ def train():
         total_reward = 0
         log_probs = []  # Store log probabilities of actions taken
         rewards = []  # Store rewards obtained
-
+        print(max_timesteps)
         for t in range(max_timesteps):
             readingsX, readingsY = getPointCloud(lidar_sensors)
             state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
             action_distribution = model.forward(state_tensor)
             action = action_distribution.sample()
-            log_prob = action_distribution.log_prob(action)
-            log_probs.append(log_prob)
 
             environment.step(action.numpy())
-            reward = compute_rewards(init_dist, dist_sensors, gps, TARGET)
-            rewards.append(reward)
-            total_reward += reward
+
+            reward = compute_rewards(TARGET, gps, dist_sensors)
+
+            if t % 10 == 0:
+
+                reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist=True)
+
+                log_prob = action_distribution.log_prob(action)
+                log_probs.append(log_prob)
+
+                print(log_probs)
+
+                print(reward)
+                rewards.append(reward)
+
+                print(rewards)
+                total_reward += reward
 
             if collision_detected(dist_sensors) or reached_target(gps, TARGET):
                 break
 
         # Convert rewards to numpy array and compute advantages
         rewards = np.array(rewards)
-        advantages = discount_rewards(rewards, gamma)  # You need to implement this function
+        rewards = rewards.repeat(2, 0)
+        print(rewards)
+        advantages = discount_rewards(rewards, gamma)
 
         # Convert log_probs to tensor
         log_probs_tensor = torch.cat(log_probs)
