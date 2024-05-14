@@ -69,6 +69,7 @@ def getTensor(readingsX, readingsY, n_div):
         tensor.append(sumY/n_div)
     return tensor
 
-
-
-
+def euclidean_dist(gps, target):
+    readings = gps.getValues()
+    x, y = round(readings[0],3), round(readings[1],3)
+    return math.sqrt((x-target[0])**2 + (y-target[1])**2)

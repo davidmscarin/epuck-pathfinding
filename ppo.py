@@ -57,7 +57,7 @@ def train():
 
     environment = Environment(robot)
     num_episodes = 1000
-    max_timesteps = 20000*timestep
+    max_timesteps = 200*timestep
     gps = getGPS(robot, timestep)
     dist_sensors = getDistSensors(robot, timestep)
     lidar_sensors = getLidar(robot, timestep)
@@ -71,7 +71,7 @@ def train():
             state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
             action_distribution = model.forward(state_tensor)
             action = action_distribution.sample()
-            print(action)
+            # print(action)
             environment.step(action.numpy())
             reward = compute_rewards(dist_sensors, gps, TARGET)
             total_reward += reward
