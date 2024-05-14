@@ -40,51 +40,108 @@ class Environment:
         lin_vel, ang_vel = action
         cmd_vel(self.robot, lin_vel, ang_vel)
         robot.step()
-
-def compute_rewards(dist_sensors, gps, TARGET):
+def compute_rewards(init_dist, dist_sensors, gps, TARGET):
     reward = 0
     if reached_target(gps, TARGET):
         reward += 10  # Reward for reaching the target
     if collision_detected(dist_sensors):
         reward -= 5  # Penalty for collision
-    init_dist = euclidean_dist(gps, TARGET)
-    
-    final_dist = euclidean_dist(gps,TARGET)
-    target_dist_gain = final_dist - init_dist
-    # total_reward += ...
+
+    final_dist = euclidean_dist(gps, TARGET)
+    target_dist_gain = init_dist - final_dist  # Calculating the distance gain
+    reward += 10 * target_dist_gain  # Reward for getting closer to target
 
     return reward
 
+
+def compute_ppo_loss(log_probs, advantages, epsilon):
+    # Convert advantages to tensor
+    advantages_tensor = torch.FloatTensor(advantages)
+
+    # Compute old policy probabilities
+    old_probs = torch.exp(log_probs)
+
+    # Compute ratio of new policy probabilities to old policy probabilities
+    new_probs = torch.exp(log_probs)
+    ratio = new_probs / old_probs
+
+    # Compute surrogate loss
+    clip_range = torch.clamp(ratio, 1 - epsilon, 1 + epsilon)
+    surrogate_loss = torch.min(ratio * advantages_tensor, clip_range * advantages_tensor)
+    surrogate_loss = -torch.mean(surrogate_loss)  # Negative because we want to maximize the objective
+
+    return surrogate_loss
+
+def discount_rewards(rewards, gamma):
+    discounted_rewards = np.zeros_like(rewards, dtype=np.float32)
+    running_add = 0
+    for t in reversed(range(len(rewards))):
+        running_add = running_add * gamma + rewards[t]
+        discounted_rewards[t] = running_add
+    return discounted_rewards
+
+
+
 def train():
-    input_dim = N_DIV*2  # Example: number of LIDAR readings
+    input_dim = N_DIV * 2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
-    model = PPO(input_dim, output_dim)
+    model = PPO(input_dim, output_dim)  # Assuming PPO is your policy network
     optimizer = optim.Adam(model.parameters(), lr=0.01)
 
     environment = Environment(robot)
     num_episodes = 1000
-    max_timesteps = 200*timestep
+    max_timesteps = 200 * timestep
     gps = getGPS(robot, timestep)
     dist_sensors = getDistSensors(robot, timestep)
     lidar_sensors = getLidar(robot, timestep)
     robot.step()
 
+    epsilon = 0.2  # Clipping parameter for PPO
+    gamma = 0.99  # Discount factor for rewards
     for episode in range(num_episodes):
         environment.reset()
+        init_dist = euclidean_dist(gps, TARGET)
         total_reward = 0
+        log_probs = []  # Store log probabilities of actions taken
+        rewards = []  # Store rewards obtained
+
         for t in range(max_timesteps):
             readingsX, readingsY = getPointCloud(lidar_sensors)
             state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
             action_distribution = model.forward(state_tensor)
             action = action_distribution.sample()
-            # print(action)
+            log_prob = action_distribution.log_prob(action)
+            log_probs.append(log_prob)
+
             environment.step(action.numpy())
-            reward = compute_rewards(dist_sensors, gps, TARGET)
+            reward = compute_rewards(init_dist, dist_sensors, gps, TARGET)
+            rewards.append(reward)
             total_reward += reward
-            if collision_detected(dist_sensors) or reached_target(gps,target):
+
+            if collision_detected(dist_sensors) or reached_target(gps, TARGET):
                 break
 
+        # Convert rewards to numpy array and compute advantages
+        rewards = np.array(rewards)
+        advantages = discount_rewards(rewards, gamma)  # You need to implement this function
+
+        # Convert log_probs to tensor
+        log_probs_tensor = torch.cat(log_probs)
+
+        # Compute surrogate loss
+        loss = compute_ppo_loss(log_probs_tensor, advantages, epsilon)
+
+        # Zero out gradients
+        optimizer.zero_grad()
+
+        # Backpropagate the loss
+        loss.backward()
+
+        # Update weights
+        optimizer.step()
+
         print(f"Episode {episode}, Total Reward: {total_reward}")
+
 
 if __name__ == "__main__":
     env = Environment(robot)
