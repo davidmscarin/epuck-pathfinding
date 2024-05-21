@@ -84,3 +84,7 @@ def turn(robot, direction, timestep=1000):
     elif direction == "left":
         cmd_vel(robot, 0, -math.pi/2)
         robot.step(timestep)
+
+    elif direction == 'forward':
+        cmd_vel(robot, linear_vel=0.1, angular_vel=0)
+        robot.step(timestep)
