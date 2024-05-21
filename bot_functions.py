@@ -75,7 +75,7 @@ def euclidean_dist(gps, target):
     return math.sqrt((x-target[0])**2 + (y-target[1])**2)
 
 
-def turn(robot, direction, timestep):
+def turn(robot, direction, timestep=1000):
 
     if direction == "right":
         cmd_vel(robot, 0, math.pi/2)
