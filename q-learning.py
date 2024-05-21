@@ -53,10 +53,11 @@ class Environment:
 
     def get_state(self):
         position = self.gps.getValues()
-        dist_values = [sensor.getValue() for sensor in self.dist_sensors]
+        #dist_values = [sensor.getValue() for sensor in self.dist_sensors]
         # Combine position and distance sensor readings to form the state
-        state = position + dist_values
-        return np.array(state)
+        state = position
+        print(np.sum(np.array(state)))
+        return np.sum(np.array(state))
 
     def compute_rewards(self):
         reward = 0
@@ -92,6 +93,7 @@ def update_q_table(state, action, reward, next_state):
 
 def train():
     # Training the robot
+    robot.step()
     for episode in range(num_episodes):
         state = env.reset()
         done = False
