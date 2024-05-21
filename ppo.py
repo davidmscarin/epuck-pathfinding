@@ -6,10 +6,10 @@ from controller import Robot, Supervisor, LidarPoint
 from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist
 from utils import cmd_vel, warp_robot
 import numpy as np
+import time
 
 robot = Supervisor()
 timestep = int(robot.getBasicTimeStep())
-print(timestep)
 TARGET = [1.000, 1.000]
 N_DIV = 8
 
@@ -43,14 +43,14 @@ class Environment:
         robot.step()
 def compute_rewards(TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
     reward = 0
-    if reached_target(gps, TARGET):
-        reward += 10  # Reward for reaching the target
-    if collision_detected(dist_sensors):
-        reward -= 5  # Penalty for collision
-
     if get_dist:
         dist = compute_dist(init_dist, gps, TARGET)
-        reward = 10 * dist
+        reward += 10 * dist
+    else:
+        if reached_target(gps, TARGET):
+            reward += 1000  # Reward for reaching the target
+        if collision_detected(dist_sensors):
+            reward -= 200  # Penalty for collision
 
     return reward
 
@@ -94,9 +94,8 @@ def train():
     optimizer = optim.Adam(model.parameters(), lr=0.05)
 
     environment = Environment(robot)
-    num_episodes = 1000
-    #max_timesteps = 200 * timestep
-    max_timesteps = 20
+    num_episodes = 500
+    max_timesteps = 700
     gps = getGPS(robot, timestep)
     dist_sensors = getDistSensors(robot, timestep)
     lidar_sensors = getLidar(robot, timestep)
@@ -105,12 +104,14 @@ def train():
     epsilon = 0.2  # Clipping parameter for PPO
     gamma = 0.99  # Discount factor for rewards
     for episode in range(num_episodes):
+        i_t = time.time()
         environment.reset()
         init_dist = euclidean_dist(gps, TARGET)
         total_reward = 0
+        step10_reward = 0
         log_probs = []  # Store log probabilities of actions taken
         rewards = []  # Store rewards obtained
-        print(max_timesteps)
+        # print(max_timesteps)
         for t in range(max_timesteps):
             readingsX, readingsY = getPointCloud(lidar_sensors)
             state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
@@ -120,29 +121,33 @@ def train():
             environment.step(action.numpy())
 
             reward = compute_rewards(TARGET, gps, dist_sensors)
+            step10_reward += reward
 
             if t % 10 == 0:
-
-                reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist=True)
-
                 log_prob = action_distribution.log_prob(action)
                 log_probs.append(log_prob)
 
-                print(log_probs)
+                # print(log_probs)
 
-                print(reward)
-                rewards.append(reward)
+                # print(reward)
+                rewards.append(step10_reward)
 
-                print(rewards)
-                total_reward += reward
+                # print(rewards)
+                total_reward += step10_reward
+                step10_reward = 0
 
             if collision_detected(dist_sensors) or reached_target(gps, TARGET):
                 break
 
+        log_prob = action_distribution.log_prob(action)
+        log_probs.append(log_prob)
+        dist_reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist=True)
+        total_reward += step10_reward + dist_reward
+        rewards.append(dist_reward+step10_reward)
         # Convert rewards to numpy array and compute advantages
         rewards = np.array(rewards)
         rewards = rewards.repeat(2, 0)
-        print(rewards)
+        # print(rewards)
         advantages = discount_rewards(rewards, gamma)
 
         # Convert log_probs to tensor
@@ -161,7 +166,8 @@ def train():
         optimizer.step()
 
         print(f"Episode {episode}, Total Reward: {total_reward}")
-
+        # total_time = time.time()-i_t
+        # print(f"\n\nTime: {total_time}\n\n")
 
 if __name__ == "__main__":
     env = Environment(robot)
