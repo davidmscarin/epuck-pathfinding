@@ -73,3 +73,14 @@ def euclidean_dist(gps, target):
     readings = gps.getValues()
     x, y = readings[0], readings[1]
     return math.sqrt((x-target[0])**2 + (y-target[1])**2)
+
+
+def turn(robot, direction, timestep):
+
+    if direction == "right":
+        cmd_vel(robot, 0, math.pi/2)
+        robot.step(timestep)
+
+    elif direction == "left":
+        cmd_vel(robot, 0, -math.pi/2)
+        robot.step(timestep)
