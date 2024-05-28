@@ -45,12 +45,12 @@ def compute_rewards(TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
     reward = 0
     if get_dist:
         dist = compute_dist(init_dist, gps, TARGET)
-        reward += 10 * dist
+        reward += round(dist,3)
     else:
         if reached_target(gps, TARGET):
-            reward += 1000  # Reward for reaching the target
+            reward += 1  # Reward for reaching the target
         if collision_detected(dist_sensors):
-            reward -= 200  # Penalty for collision
+            reward -= 0.5  # Penalty for collision
 
     return reward
 
@@ -88,7 +88,6 @@ def discount_rewards(rewards, gamma):
 
 
 def train():
-
     #learning params
     input_dim = N_DIV * 2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
@@ -96,12 +95,13 @@ def train():
     optimizer = optim.Adam(model.parameters(), lr=0.05)
     epsilon = 0.2  # Clipping parameter for PPO
     gamma = 0.99  # Discount factor for rewards
-    loss_over_time = []
+    loss_over_time = [] # Stores the loss after each episode
+    reward_over_time = [] # Stores the reward after each episode
 
     #env variables
     environment = Environment(robot)
-    num_episodes = 500
-    max_timesteps = 700
+    num_episodes = 1000
+    max_timesteps = 800
     save_rate = 100
 
     #robot sensors
@@ -157,6 +157,7 @@ def train():
         log_probs.append(log_prob)
         dist_reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist=True)
         total_reward += step10_reward + dist_reward
+        reward_over_time.append(total_reward)
         rewards.append(dist_reward+step10_reward)
         # Convert rewards to numpy array and compute advantages
         rewards = np.array(rewards)
@@ -184,7 +185,10 @@ def train():
 
         #save model every number of episodes
         if episode+1 % save_rate == 0:
-            torch.save(model, 'model_run_'+str(episode)+'.pth')
+            torch.save(model, 'model_run_'+str(episode+1)+'.pth')
+
+    np.save("loss_over_time", loss_over_time)
+    np.save("reward_over_time", reward_over_time)
 
 
 if __name__ == "__main__":
