@@ -88,22 +88,35 @@ def discount_rewards(rewards, gamma):
 
 
 def train():
+
+    #learning params
     input_dim = N_DIV * 2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
     model = PPO(input_dim, output_dim)
     optimizer = optim.Adam(model.parameters(), lr=0.05)
+    epsilon = 0.2  # Clipping parameter for PPO
+    gamma = 0.99  # Discount factor for rewards
+    loss_over_time = []
 
+    #env variables
     environment = Environment(robot)
     num_episodes = 500
     max_timesteps = 700
+    save_rate = 100
+
+    #robot sensors
     gps = getGPS(robot, timestep)
     dist_sensors = getDistSensors(robot, timestep)
     lidar_sensors = getLidar(robot, timestep)
     robot.step()
 
-    epsilon = 0.2  # Clipping parameter for PPO
-    gamma = 0.99  # Discount factor for rewards
+
+    #training loop
+    print(f"Running {num_episodes} episodes")
     for episode in range(num_episodes):
+        print(f"Episode {episode} started")
+
+        #other variables
         i_t = time.time()
         environment.reset()
         init_dist = euclidean_dist(gps, TARGET)
@@ -111,7 +124,8 @@ def train():
         step10_reward = 0
         log_probs = []  # Store log probabilities of actions taken
         rewards = []  # Store rewards obtained
-        # print(max_timesteps)
+
+        print(f"Running {max_timesteps} timesteps")
         for t in range(max_timesteps):
             readingsX, readingsY = getPointCloud(lidar_sensors)
             state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
@@ -152,22 +166,26 @@ def train():
 
         # Convert log_probs to tensor
         log_probs_tensor = torch.cat(log_probs)
+        print(f"Advantages:{advantages.shape}")
+        print(f"log probabilities:{log_probs_tensor.shape}")
+        print(f"Epsilon:{epsilon}")
 
         # Compute surrogate loss
         loss = compute_ppo_loss(log_probs_tensor, advantages, epsilon)
+        print(f"Loss: {loss}")
+        loss_over_time.append(loss)
 
-        # Zero out gradients
+        # Backpropagation
+        loss.backward()
+        optimizer.step()
         optimizer.zero_grad()
 
-        # Backpropagate the loss
-        loss.backward()
+        print(f"Episode {episode} Finished\nTotal Reward: {total_reward}")
 
-        # Update weights
-        optimizer.step()
+        #save model every number of episodes
+        if episode+1 % save_rate == 0:
+            torch.save(model, 'model_run_'+str(episode)+'.pth')
 
-        print(f"Episode {episode}, Total Reward: {total_reward}")
-        # total_time = time.time()-i_t
-        # print(f"\n\nTime: {total_time}\n\n")
 
 if __name__ == "__main__":
     env = Environment(robot)
