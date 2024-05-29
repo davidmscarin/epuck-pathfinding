@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
 from controller import Robot, Supervisor, LidarPoint
-from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist
+from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist, manhattan_dist
 from utils import cmd_vel, warp_robot
 import numpy as np
 import time
@@ -41,24 +41,32 @@ class Environment:
         lin_vel, ang_vel = action
         cmd_vel(self.robot, lin_vel, ang_vel)
         robot.step()
-def compute_rewards(TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
+def compute_rewards(system, TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
+
     reward = 0
     if get_dist:
-        dist = compute_dist(init_dist, gps, TARGET)
+        dist = -compute_dist(system, init_dist, gps, TARGET)
         reward += round(dist,3)
     else:
         if reached_target(gps, TARGET):
-            reward += 1  # Reward for reaching the target
+            reward += 10  # Reward for reaching the target
         if collision_detected(dist_sensors):
-            reward -= 0.5  # Penalty for collision
+            reward -= 0.75  # Penalty for collision
 
+    print("Reward: ", reward)
     return reward
 
-def compute_dist(init_dist, gps, TARGET):
-    final_dist = euclidean_dist(gps, TARGET)
-    target_dist_gain = init_dist - final_dist  # Calculating the distance gain
-    return target_dist_gain
 
+def compute_dist(system, init_dist, gps, TARGET):
+    if system == 'Euclidean':
+        final_dist = euclidean_dist(gps, TARGET)
+        #target_dist_gain = init_dist - final_dist  # Calculating the distance gain
+        #print("dist gain: ", dist_gain)
+        return final_dist
+
+    elif system == 'Manhattan':
+        final_dist = manhattan_dist(gps, TARGET)
+        return final_dist
 def compute_ppo_loss(log_probs, advantages, epsilon):
     # Convert advantages to tensor
     advantages_tensor = torch.FloatTensor(advantages)
@@ -92,7 +100,7 @@ def train():
     input_dim = N_DIV * 2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
     model = PPO(input_dim, output_dim)
-    optimizer = optim.Adam(model.parameters(), lr=0.05)
+    optimizer = optim.Adam(model.parameters(), lr=0.003)
     epsilon = 0.2  # Clipping parameter for PPO
     gamma = 0.99  # Discount factor for rewards
     loss_over_time = [] # Stores the loss after each episode
@@ -121,7 +129,6 @@ def train():
         environment.reset()
         init_dist = euclidean_dist(gps, TARGET)
         total_reward = 0
-        step10_reward = 0
         log_probs = []  # Store log probabilities of actions taken
         rewards = []  # Store rewards obtained
 
@@ -134,31 +141,28 @@ def train():
 
             environment.step(action.numpy())
 
-            reward = compute_rewards(TARGET, gps, dist_sensors)
-            step10_reward += reward
+            if t+1 % 10 != 0:
+                get_dist = False #we only calculate the distance every 10 timesteps
 
-            if t % 10 == 0:
+            elif t+1 % 10 == 0:
+                get_dist = True
+
+            step_reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist)
+            total_reward += step_reward
+
+            if get_dist == True: #only save log probs and rewards every 10 timesteps to save space
                 log_prob = action_distribution.log_prob(action)
                 log_probs.append(log_prob)
-
-                # print(log_probs)
-
-                # print(reward)
-                rewards.append(step10_reward)
-
-                # print(rewards)
-                total_reward += step10_reward
-                step10_reward = 0
+                rewards.append(step_reward)
 
             if collision_detected(dist_sensors) or reached_target(gps, TARGET):
                 break
 
         log_prob = action_distribution.log_prob(action)
         log_probs.append(log_prob)
-        dist_reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist=True)
-        total_reward += step10_reward + dist_reward
+
         reward_over_time.append(total_reward)
-        rewards.append(dist_reward+step10_reward)
+
         # Convert rewards to numpy array and compute advantages
         rewards = np.array(rewards)
         rewards = rewards.repeat(2, 0)
@@ -185,7 +189,9 @@ def train():
 
         #save model every number of episodes
         if episode+1 % save_rate == 0:
-            torch.save(model, 'model_run_'+str(episode+1)+'.pth')
+            print(episode+1)
+            print(save_rate)
+            torch.save(model, 'models\model_run_'+str(episode+1)+'.pth')
 
     np.save("loss_over_time", loss_over_time)
     np.save("reward_over_time", reward_over_time)

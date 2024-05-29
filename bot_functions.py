@@ -74,6 +74,9 @@ def euclidean_dist(gps, target):
     x, y = readings[0], readings[1]
     return math.sqrt((x-target[0])**2 + (y-target[1])**2)
 
+def manhattan_dist(gps, target):
+    readings = gps.getValues()
+    return sum(abs(val1 - val2) for val1, val2 in zip(readings, target))
 
 def turn(robot, direction, timestep=500):
 
