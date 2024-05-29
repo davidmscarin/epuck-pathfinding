@@ -53,19 +53,18 @@ def compute_dist(system, init_dist, gps, TARGET):
         final_dist = manhattan_dist(gps, TARGET)
         return final_dist
 
-def compute_rewards(system, TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
+def compute_rewards(system, TARGET, gps, dist_sensors, init_dist = 0, get_dist = True):
     reward = 0
     # print(get_dist)
-    if get_dist:
+    if reached_target(gps, TARGET):
+        reward = 3  # Reward for reaching the target
+    elif collision_detected(dist_sensors):
+        reward = -3  # Penalty for collision
+    elif get_dist:
         dist = -compute_dist(system, init_dist, gps, TARGET)
-        reward += round(dist,3)
-    else:
-        if reached_target(gps, TARGET):
-            reward += 10  # Reward for reaching the target
-        if collision_detected(dist_sensors):
-            reward -= 0.75  # Penalty for collision
+        reward = round(dist,8)
 
-    print("Reward: ", reward)
+    # print("Reward: ", reward)
     return reward
 
 def compute_ppo_loss(log_probs, advantages, epsilon):
@@ -108,7 +107,7 @@ def train():
 
     #env variables
     environment = Environment(robot)
-    num_episodes = 1000
+    num_episodes = 500
     max_timesteps = 800
     save_rate = 100
 
@@ -117,7 +116,6 @@ def train():
     dist_sensors = getDistSensors(robot, timestep)
     lidar_sensors = getLidar(robot, timestep)
     robot.step()
-
 
     #training loop
     print(f"Running {num_episodes} episodes")
@@ -141,27 +139,18 @@ def train():
 
             environment.step(action.numpy())
 
-            # print(t)
-            if (t+1) % 10 != 0:
-                get_dist = False  # we only calculate the distance every 10 timesteps
-
-            if (t+1) % 10 == 0:
-                get_dist = True
-
-            step_reward = compute_rewards("Manhattan", TARGET, gps, dist_sensors, init_dist, get_dist)
+            step_reward = compute_rewards("Manhattan", TARGET, gps, dist_sensors, init_dist)
             total_reward += step_reward
 
-            if get_dist == True:  # only save log probs and rewards every 10 timesteps to save space
-                log_prob = action_distribution.log_prob(action)
-                log_probs.append(log_prob)
-                rewards.append(step_reward)
+            log_prob = action_distribution.log_prob(action)
+            log_probs.append(log_prob)
+            rewards.append(step_reward)
 
-            if collision_detected(dist_sensors) or reached_target(gps, TARGET):
+            if step_reward <= -3 or step_reward >= 3:
+                print(f"Stopped early. Timestep: {t}")
                 break
 
-        log_prob = action_distribution.log_prob(action)
-        log_probs.append(log_prob)
-
+        print(rewards)
         reward_over_time.append(total_reward)
 
         # Convert rewards to numpy array and compute advantages
@@ -187,6 +176,7 @@ def train():
         optimizer.zero_grad()
 
         print(f"Episode {episode} Finished\nTotal Reward: {total_reward}")
+        print()
 
         #save model every number of episodes
         if (episode+1) % save_rate == 0:
