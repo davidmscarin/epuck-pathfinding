@@ -41,9 +41,21 @@ class Environment:
         lin_vel, ang_vel = action
         cmd_vel(self.robot, lin_vel, ang_vel)
         robot.step()
-def compute_rewards(system, TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
 
+def compute_dist(system, init_dist, gps, TARGET):
+    if system == 'Euclidean':
+        final_dist = euclidean_dist(gps, TARGET)
+        #target_dist_gain = init_dist - final_dist  # Calculating the distance gain
+        #print("dist gain: ", dist_gain)
+        return final_dist
+
+    elif system == 'Manhattan':
+        final_dist = manhattan_dist(gps, TARGET)
+        return final_dist
+
+def compute_rewards(system, TARGET, gps, dist_sensors, init_dist = 0, get_dist = False):
     reward = 0
+    # print(get_dist)
     if get_dist:
         dist = -compute_dist(system, init_dist, gps, TARGET)
         reward += round(dist,3)
@@ -56,17 +68,6 @@ def compute_rewards(system, TARGET, gps, dist_sensors, init_dist = 0, get_dist =
     print("Reward: ", reward)
     return reward
 
-
-def compute_dist(system, init_dist, gps, TARGET):
-    if system == 'Euclidean':
-        final_dist = euclidean_dist(gps, TARGET)
-        #target_dist_gain = init_dist - final_dist  # Calculating the distance gain
-        #print("dist gain: ", dist_gain)
-        return final_dist
-
-    elif system == 'Manhattan':
-        final_dist = manhattan_dist(gps, TARGET)
-        return final_dist
 def compute_ppo_loss(log_probs, advantages, epsilon):
     # Convert advantages to tensor
     advantages_tensor = torch.FloatTensor(advantages)
@@ -92,7 +93,6 @@ def discount_rewards(rewards, gamma):
         running_add = running_add * gamma + rewards[t]
         discounted_rewards[t] = running_add
     return discounted_rewards
-
 
 
 def train():
@@ -141,16 +141,17 @@ def train():
 
             environment.step(action.numpy())
 
-            if t+1 % 10 != 0:
-                get_dist = False #we only calculate the distance every 10 timesteps
+            # print(t)
+            if (t+1) % 10 != 0:
+                get_dist = False  # we only calculate the distance every 10 timesteps
 
-            elif t+1 % 10 == 0:
+            if (t+1) % 10 == 0:
                 get_dist = True
 
-            step_reward = compute_rewards(TARGET, gps, dist_sensors, init_dist, get_dist)
+            step_reward = compute_rewards("Manhattan", TARGET, gps, dist_sensors, init_dist, get_dist)
             total_reward += step_reward
 
-            if get_dist == True: #only save log probs and rewards every 10 timesteps to save space
+            if get_dist == True:  # only save log probs and rewards every 10 timesteps to save space
                 log_prob = action_distribution.log_prob(action)
                 log_probs.append(log_prob)
                 rewards.append(step_reward)
@@ -188,7 +189,7 @@ def train():
         print(f"Episode {episode} Finished\nTotal Reward: {total_reward}")
 
         #save model every number of episodes
-        if episode+1 % save_rate == 0:
+        if (episode+1) % save_rate == 0:
             print(episode+1)
             print(save_rate)
             torch.save(model, 'models\model_run_'+str(episode+1)+'.pth')

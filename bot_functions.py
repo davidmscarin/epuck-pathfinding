@@ -79,7 +79,6 @@ def manhattan_dist(gps, target):
     return sum(abs(val1 - val2) for val1, val2 in zip(readings, target))
 
 def turn(robot, direction, timestep=500):
-
     if direction == "right":
         cmd_vel(robot, 0, math.pi/2)
         robot.step(timestep)
