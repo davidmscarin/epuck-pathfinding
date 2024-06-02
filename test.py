@@ -1,13 +1,43 @@
-from controller import Robot, Lidar
+from controller import Robot
+from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist, manhattan_dist
 from utils import cmd_vel
-from bot_functions import turn
-import math
-import time
+import torch
+from ppo import PPO
+
+
+def load_model(name, input_dim = 16, output_dim = 2):
+
+    model = PPO(input_dim, output_dim)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
+    epsilon = 0.2  # Clipping parameter for PPO
+    gamma = 0.99  # Discount factor for rewards
+
+    checkpoint = torch.load(name)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    episode = checkpoint['epoch']
+    loss = checkpoint['loss']
+
+    return model, optimizer, epsilon, gamma, checkpoint, episode, loss
+
+
 robot = Robot()
-
 timestep = int(robot.getBasicTimeStep())
-dir = "right"
+N_DIV = 8
+lidar_sensors = getLidar(robot, timestep)
+model, optimizer, epsilon, gamma, checkpoint, episode, loss = load_model('model name')
 
-while robot.step() != -1:
-    turn(robot, dir)
-    time.sleep(3)
+while robot.step(timestep) != -1:
+
+    #get world state
+    readingsX, readingsY = getPointCloud(lidar_sensors)
+    state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
+
+    #get action
+    action_distribution = model.forward(state_tensor)
+    action = action_distribution.sample()
+
+    #apply action
+    lin_vel, ang_vel = action
+    print(f"lin_vel: {lin_vel}\nang_vel: {ang_vel}")
+    cmd_vel(robot, lin_vel, ang_vel)

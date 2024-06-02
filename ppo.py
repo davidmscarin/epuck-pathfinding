@@ -178,14 +178,19 @@ def train():
         print(f"Episode {episode} Finished\nTotal Reward: {total_reward}")
         print()
 
-        #save model every number of episodes
-        if (episode+1) % save_rate == 0:
-            print(episode+1)
+        # save last episode
+        if (episode + 1) % save_rate == 0:
+            print(episode + 1)
             print(save_rate)
-            torch.save(model, 'models\model_run_'+str(episode+1)+'.pth')
+            torch.save({
+                'episode': episode,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': loss,
+            }, '/models')
 
-    np.save("loss_over_time", loss_over_time)
-    np.save("reward_over_time", reward_over_time)
+    np.save("loss_over_time", np.array(loss_over_time))
+    np.save("reward_over_time", np.array(reward_over_time))
 
 
 if __name__ == "__main__":
