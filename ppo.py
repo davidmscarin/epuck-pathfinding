@@ -94,21 +94,29 @@ def discount_rewards(rewards, gamma):
     return discounted_rewards
 
 
-def train():
-    #learning params
+def train(load = False, model_name = None):
+
     input_dim = N_DIV * 2  # Example: number of LIDAR readings
     output_dim = 2  # Linear and angular velocities
     model = PPO(input_dim, output_dim)
-    optimizer = optim.Adam(model.parameters(), lr=0.003)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.003)
     epsilon = 0.2  # Clipping parameter for PPO
     gamma = 0.99  # Discount factor for rewards
-    loss_over_time = [] # Stores the loss after each episode
-    reward_over_time = [] # Stores the reward after each episode
+
+    if load:
+        checkpoint = torch.load(model_name)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        episode = checkpoint['episode']
+        loss = checkpoint['loss']
+
+    loss_over_time = []  # Stores the loss after each episode
+    reward_over_time = []  # Stores the reward after each episode
 
     #env variables
     environment = Environment(robot)
-    num_episodes = 500
-    max_timesteps = 800
+    num_episodes = 1000
+    max_timesteps = 500
     save_rate = 100
 
     #robot sensors
@@ -120,7 +128,7 @@ def train():
     #training loop
     print(f"Running {num_episodes} episodes")
     for episode in range(num_episodes):
-        print(f"Episode {episode} started")
+        print(f"Episode {episode+1} started")
 
         #other variables
         i_t = time.time()
@@ -179,7 +187,7 @@ def train():
         print()
 
         # save last episode
-        if (episode + 1) % save_rate == 0:
+        if (episode + 1) % save_rate == 0 or episode == 0:
             print(episode + 1)
             print(save_rate)
             torch.save({
@@ -187,7 +195,7 @@ def train():
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': loss,
-            }, '/models')
+            }, 'models/model_test2_run'+str(episode+1))
 
     np.save("loss_over_time", np.array(loss_over_time))
     np.save("reward_over_time", np.array(reward_over_time))

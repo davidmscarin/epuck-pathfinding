@@ -2,7 +2,24 @@ from controller import Robot
 from bot_functions import collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist, manhattan_dist
 from utils import cmd_vel
 import torch
-from ppo import PPO
+import torch.nn as nn
+from torch.distributions import Normal
+
+
+class PPO(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(PPO, self).__init__()
+        self.fc1 = nn.Linear(input_dim, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, output_dim)
+        self.sigma = nn.Parameter(torch.zeros(output_dim))
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        mu = self.fc3(x)
+        sigma = torch.exp(self.sigma)
+        return Normal(mu, sigma)
 
 
 def load_model(name, input_dim = 16, output_dim = 2):
@@ -15,7 +32,7 @@ def load_model(name, input_dim = 16, output_dim = 2):
     checkpoint = torch.load(name)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    episode = checkpoint['epoch']
+    episode = checkpoint['episode']
     loss = checkpoint['loss']
 
     return model, optimizer, epsilon, gamma, checkpoint, episode, loss
@@ -25,7 +42,7 @@ robot = Robot()
 timestep = int(robot.getBasicTimeStep())
 N_DIV = 8
 lidar_sensors = getLidar(robot, timestep)
-model, optimizer, epsilon, gamma, checkpoint, episode, loss = load_model('model name')
+model, optimizer, epsilon, gamma, checkpoint, episode, loss = load_model('models/model_test2_run1000')
 
 while robot.step(timestep) != -1:
 
