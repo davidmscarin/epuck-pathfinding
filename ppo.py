@@ -110,8 +110,8 @@ def train(load = False, model_name = None):
         episode = checkpoint['episode']
         loss = checkpoint['loss']
 
-    loss_over_time = []  # Stores the loss after each episode
-    reward_over_time = []  # Stores the reward after each episode
+    loss_over_time = np.array([]) # Stores the loss after each episode
+    reward_over_time = np.array([])  # Stores the reward after each episode
 
     #env variables
     environment = Environment(robot)
@@ -159,7 +159,7 @@ def train(load = False, model_name = None):
                 break
 
         print(rewards)
-        reward_over_time.append(total_reward)
+        reward_over_time = np.append(reward_over_time, total_reward)
 
         # Convert rewards to numpy array and compute advantages
         rewards = np.array(rewards)
@@ -176,7 +176,7 @@ def train(load = False, model_name = None):
         # Compute surrogate loss
         loss = compute_ppo_loss(log_probs_tensor, advantages, epsilon)
         print(f"Loss: {loss}")
-        loss_over_time.append(loss)
+        loss_over_time = np.append(loss_over_time, loss)
 
         # Backpropagation
         loss.backward()
@@ -197,8 +197,8 @@ def train(load = False, model_name = None):
                 'loss': loss,
             }, 'models/model_test2_run'+str(episode+1))
 
-    np.save("loss_over_time", np.array(loss_over_time))
-    np.save("reward_over_time", np.array(reward_over_time))
+    np.save("loss_over_time", loss_over_time)
+    np.save("reward_over_time", reward_over_time)
 
 
 if __name__ == "__main__":
