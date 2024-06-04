@@ -197,8 +197,8 @@ def train(load = False, model_name = None):
                 'loss': loss,
             }, 'models/model_test2_run'+str(episode+1))
 
-    np.save("loss_over_time", loss_over_time)
-    np.save("reward_over_time", reward_over_time)
+    np.save("../loss_over_time", loss_over_time)
+    np.save("../reward_over_time", reward_over_time)
 
 
 if __name__ == "__main__":
