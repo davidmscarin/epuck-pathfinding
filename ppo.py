@@ -115,8 +115,8 @@ def train(load = False, model_name = None):
 
     #env variables
     environment = Environment(robot)
-    num_episodes = 1000
-    max_timesteps = 500
+    num_episodes = 10
+    max_timesteps = 50
     save_rate = 100
 
     #robot sensors
@@ -176,7 +176,7 @@ def train(load = False, model_name = None):
         # Compute surrogate loss
         loss = compute_ppo_loss(log_probs_tensor, advantages, epsilon)
         print(f"Loss: {loss}")
-        loss_over_time = np.append(loss_over_time, loss)
+        loss_over_time = np.append(loss_over_time, loss.detach().numpy())
 
         # Backpropagation
         loss.backward()
