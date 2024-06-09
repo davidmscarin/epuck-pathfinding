@@ -267,7 +267,7 @@ def train():
 
     for i_episode in range(num_episodes):
 
-        total_reward = 0
+        total_reward: float = 0
 
         print(f"Episode {i_episode} started")
         # Initialize the environment and get its state
@@ -321,12 +321,12 @@ def train():
                 plot_durations()
                 break
 
-            if (t + 1) % save_rate == 0 or t == 0:
-                torch.save({
-                    'episode': t,
-                    'model_state_dict': policy_net.state_dict(),
-                    'optimizer_state_dict': policy_net.state_dict(),
-                }, 'my_models/model_test_dqn_run' + str(t + 1))
+        if (i_episode + 1) % save_rate == 0 or i_episode == 0:
+            torch.save({
+                'episode': i_episode,
+                'model_state_dict': policy_net.state_dict(),
+                'optimizer_state_dict': policy_net.state_dict(),
+            }, 'my_models/model_test_dqn_run' + str(t + 1))
 
         reward_hist.append(total_reward)
 
