@@ -12,6 +12,7 @@ from bot_functions import take_action, collision_detected, reached_target, get_i
 from controller import Supervisor
 from utils import cmd_vel, warp_robot
 import numpy as np
+import pickle
 
 
 robot = Supervisor()
@@ -261,14 +262,20 @@ def train():
 
     print(f"Running {num_episodes} episodes")
 
+    save_rate = 100
+    reward_hist = []
+
     for i_episode in range(num_episodes):
+
+        total_reward = 0
+
         print(f"Episode {i_episode} started")
         # Initialize the environment and get its state
         env.reset()
-        state = env.get_state_tensor()
-        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-        print(f"State: {state}")
         for t in count():
+            state = env.get_state_tensor()
+            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
+            print(f"State: {state}")
             random_action, action = select_action(state)
             if not random_action:
                 action_int = action.item()+1
@@ -283,6 +290,7 @@ def train():
                 print("Terminated")
             print(f"Reward: {reward}")
             reward = torch.tensor([reward], device=device)
+            total_reward+=reward
             done = terminated or truncated
 
             if terminated:
@@ -313,7 +321,18 @@ def train():
                 plot_durations()
                 break
 
+            if (t + 1) % save_rate == 0 or t == 0:
+                torch.save({
+                    'episode': t,
+                    'model_state_dict': policy_net.state_dict(),
+                    'optimizer_state_dict': policy_net.state_dict(),
+                }, 'my_models/model_test_dqn_run' + str(t + 1))
+
+        reward_hist.append(total_reward)
+
     print('Complete')
+    with open('reward_hist', 'wb') as f:
+        pickle.dump(reward_hist, f)
     plot_durations(show_result=True)
     plt.ioff()
     plt.show()
