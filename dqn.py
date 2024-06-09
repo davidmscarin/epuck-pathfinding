@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from bot_functions import take_action, collision_detected, reached_target, get_initial_coordinates, getDistSensors, getGPS, getLidar, getPointCloud, getTensor, euclidean_dist, manhattan_dist
 from controller import Supervisor
 from utils import cmd_vel, warp_robot
+import numpy as np
 
 
 robot = Supervisor()
@@ -69,6 +70,8 @@ class Environment:
         self.dist_sensors = getDistSensors(robot, timestep)
         self.lidar_sensors = getLidar(robot, timestep)
         robot.step()
+        self.action_space = [1, 2, 3]
+        self.action_dict = {1: "forward", 2: "right", 3: "left"}
 
     def compute_dist(self, system, gps, TARGET):
         if system == 'Euclidean':
@@ -112,12 +115,11 @@ class Environment:
         elif reward < -3:
             truncated = True
 
+        action = self.action_dict[action]
         take_action(robot, action)
 
         return reward, truncated, terminated
 
-    action_space = [1, 2, 3]
-    action_dict = {1: "forward", 2: "right", 3: "left"}
 
     def get_state_tensor(self):
         readingsX, readingsY = getPointCloud(lidar_sensors)
@@ -156,19 +158,27 @@ memory = ReplayMemory(100000)
 steps_done = 0
 
 def select_action(state):
+    test = False
+    random_action = True
     global steps_done
     sample = random.random()
     eps_threshold = EPS_END + (EPS_START - EPS_END) * \
                     math.exp(-1. * steps_done / EPS_DECAY)
     steps_done += 1
-    if sample > eps_threshold:
+    if sample > eps_threshold or test == True:
         with torch.no_grad():
             # t.max(1) will return the largest column value of each row.
             # second column on max result is index of where max element was
             # found, so we pick action with the larger expected reward.
-            return policy_net(state).max(1).indices.view(1, 1)
+            random_action = False
+            policy_net_output = policy_net(state)
+            print(f"policy net state: {policy_net_output}")
+            print(f"max value index: {torch.argmax(policy_net_output)}")
+            #return random_action, policy_net(state).max(1).indices.view(1, 1) #o que estava originalmente
+            return random_action, torch.argmax(policy_net(state))
+
     else:
-        return torch.tensor([[random.choice(env.action_space)]], device=device, dtype=torch.long)
+        return random_action, torch.tensor([[random.choice(env.action_space)]], device=device, dtype=torch.long)
 
 episode_durations = []
 
@@ -259,9 +269,14 @@ def train():
         state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
         print(f"State: {state}")
         for t in count():
-            action = select_action(state)
-            print(f"Action: {env.action_dict[action]}")
-            reward, truncated, terminated = env.step(action.item())
+            random_action, action = select_action(state)
+            if not random_action:
+                action_int = action.item()+1
+            else:
+                action_int = action.item()
+            print(f"Action: {action_int}, random: {random_action}")
+            print(f"Action: {env.action_dict[action_int]}")
+            reward, truncated, terminated = env.step(action_int)
             if truncated:
                 print("Truncated")
             if terminated:
