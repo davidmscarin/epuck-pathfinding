@@ -128,7 +128,7 @@ class Environment:
         state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
         return state_tensor
 
-BATCH_SIZE = 128
+BATCH_SIZE = 10
 GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
@@ -177,7 +177,7 @@ def select_action(state):
             print(f"policy net state: {policy_net_output}")
             print(f"max value index: {torch.argmax(policy_net_output)}")
             #return random_action, policy_net(state).max(1).indices.view(1, 1) #o que estava originalmente
-            return random_action, torch.argmax(policy_net(state))
+            return random_action, torch.tensor([[torch.argmax(policy_net(state))]], device=device, dtype=torch.long)
 
     else:
         return random_action, torch.tensor([[random.choice(env.action_space)]], device=device, dtype=torch.long)
