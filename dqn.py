@@ -72,8 +72,8 @@ class Environment:
         self.gps = gps
         self.dist_sensors = dist_sensors
         self.lidar_sensors = lidar_sensors
-        self.action_space = [1, 2, 3]
-        self.action_dict = {1: "forward", 2: "right", 3: "left"}
+        self.action_space = [0, 1, 2]
+        self.action_dict = {0: "forward", 1: "right", 2: "left"}
 
     def compute_dist(self, system, gps, TARGET):
         if system == 'Euclidean':
@@ -236,19 +236,22 @@ def optimize_model():
     non_final_next_states = torch.cat([s for s in batch.next_state
                                                 if s is not None])
 
-    print(f"non final next states: {non_final_next_states.shape}")
+    #print(f"non final next states: {non_final_next_states.shape}")
 
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
-    print(f"state shape: {state_batch.shape}, {state_batch.shape[1]}")
-    print(f"action shape: {action_batch.shape}")
-    print(f"reward shape: {reward_batch.shape}")
+    # print(f"state shape: {state_batch.shape}, {state_batch.shape[1]}")
+    # print(f"action shape: {action_batch.shape}")
+    # print(f"reward shape: {reward_batch.shape}")
+    #
+    # print(f"state: {state_batch}")
+    # print(f"action: {action_batch}")
 
-    action_batch = torch.repeat_interleave(action_batch, state_batch.shape[1], dim=0)
-    action_batch = action_batch[None, :]
+    #action_batch = torch.repeat_interleave(action_batch, state_batch.shape[1], dim=0)
+    #action_batch = action_batch[None, :]
 
-    print(f"changed action shape: {action_batch.shape}")
+    #print(f"changed action shape: {action_batch.shape}")
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
@@ -299,10 +302,7 @@ def train():
             state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
             print(f"State: {state}")
             random_action, action = select_action(state)
-            if not random_action:
-                action_int = action.item()+1
-            else:
-                action_int = action.item()
+            action_int = action.item()
             print(f"Action: {action_int}, random: {random_action}")
             print(f"Action: {env.action_dict[action_int]}")
             reward, truncated, terminated = env.step(action_int)
@@ -322,7 +322,7 @@ def train():
                 next_state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
             # Store the transition in memory
-            memory.push(state, torch.tensor(action_int).unsqueeze(0), next_state, reward)
+            memory.push(state, action, next_state, reward)
 
             # Move to the next state
             state = next_state
