@@ -13,6 +13,8 @@ from controller import Supervisor
 from utils import cmd_vel, warp_robot
 import numpy as np
 import pickle
+import warnings
+warnings.filterwarnings("ignore")
 
 
 robot = Supervisor()
@@ -65,12 +67,11 @@ class DQN(nn.Module):
 class Environment:
     def __init__(self, robot, TARGET, gps, dist_sensors, lidar_sensors):
         self.robot = robot
-        self.TARGET = TARGET = [1.000, 1.000]
+        self.TARGET = TARGET
         # initialize robot sensors
-        self.gps = getGPS(robot, timestep)
-        self.dist_sensors = getDistSensors(robot, timestep)
-        self.lidar_sensors = getLidar(robot, timestep)
-        robot.step()
+        self.gps = gps
+        self.dist_sensors = dist_sensors
+        self.lidar_sensors = lidar_sensors
         self.action_space = [1, 2, 3]
         self.action_dict = {1: "forward", 2: "right", 3: "left"}
 
@@ -212,23 +213,42 @@ def plot_durations(show_result=False):
 
 
 def optimize_model():
+    print("Optimizing")
+
     if len(memory) < BATCH_SIZE:
+        print("batch too small")
         return
     transitions = memory.sample(BATCH_SIZE)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
     # detailed explanation). This converts batch-array of Transitions
     # to Transition of batch-arrays.
     batch = Transition(*zip(*transitions))
+    print(f"Batch:\n{batch}\n")
 
     # Compute a mask of non-final states and concatenate the batch elements
     # (a final state would've been the one after which simulation ended)
     non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                           batch.next_state)), device=device, dtype=torch.bool)
+
+    print(f"non final mask: {non_final_mask.shape}")
+
+
     non_final_next_states = torch.cat([s for s in batch.next_state
                                                 if s is not None])
+
+    print(f"non final next states: {non_final_next_states.shape}")
+
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
     reward_batch = torch.cat(batch.reward)
+    print(f"state shape: {state_batch.shape}, {state_batch.shape[1]}")
+    print(f"action shape: {action_batch.shape}")
+    print(f"reward shape: {reward_batch.shape}")
+
+    action_batch = torch.repeat_interleave(action_batch, state_batch.shape[1], dim=0)
+    action_batch = action_batch[None, :]
+
+    print(f"changed action shape: {action_batch.shape}")
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
@@ -242,7 +262,7 @@ def optimize_model():
     # state value or 0 in case the state was final.
     next_state_values = torch.zeros(BATCH_SIZE, device=device)
     with torch.no_grad():
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+        next_state_values[non_final_mask] = torch.max(target_net(non_final_next_states))
     # Compute the expected Q values
     expected_state_action_values = (next_state_values * GAMMA) + reward_batch
 
@@ -256,6 +276,8 @@ def optimize_model():
     # In-place gradient clipping
     torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
     optimizer.step()
+
+    print("Optimization complete")
 
 def train():
     num_episodes = 500
@@ -290,7 +312,7 @@ def train():
                 print("Terminated")
             print(f"Reward: {reward}")
             reward = torch.tensor([reward], device=device)
-            total_reward+=reward
+            total_reward+=float(reward)
             done = terminated or truncated
 
             if terminated:
@@ -300,7 +322,7 @@ def train():
                 next_state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
             # Store the transition in memory
-            memory.push(state, action, next_state, reward)
+            memory.push(state, torch.tensor(action_int).unsqueeze(0), next_state, reward)
 
             # Move to the next state
             state = next_state
