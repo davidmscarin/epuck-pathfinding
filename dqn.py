@@ -114,7 +114,7 @@ class Environment:
 
         if reward >= 3:
             terminated = True
-        elif reward < -3:
+        elif reward <= -3:
             truncated = True
 
         action = self.action_dict[action]
@@ -210,6 +210,32 @@ def plot_durations(show_result=False):
         else:
             display.display(plt.gcf())
 
+reward_hist = []
+def plot_rewards(show_result=False):
+    plt.figure(1)
+    rewards_t = torch.tensor(reward_hist, dtype=torch.float)
+    if show_result:
+        plt.title('Result')
+    else:
+        plt.clf()
+        plt.title('Training...')
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.plot(rewards_t.numpy())
+    # Take 100 episode averages and plot them too
+    if len(rewards_t) >= 100:
+        means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
+        means = torch.cat((torch.zeros(99), means))
+        plt.plot(means.numpy())
+
+    plt.pause(0.001)  # pause a bit so that plots are updated
+    if is_ipython:
+        if not show_result:
+            display.display(plt.gcf())
+            display.clear_output(wait=True)
+        else:
+            display.display(plt.gcf())
+
 
 
 def optimize_model():
@@ -293,7 +319,6 @@ def train():
     print(f"Running {num_episodes} episodes")
 
     save_rate = 10
-    reward_hist = []
 
     for i_episode in range(num_episodes):
 
@@ -351,9 +376,13 @@ def train():
                 target_net_state_dict[key] = policy_net_state_dict[key] * TAU + target_net_state_dict[key] * (1 - TAU)
             target_net.load_state_dict(target_net_state_dict)
 
+            print(f"done: {done}")
+
             if done:
                 episode_durations.append(t + 1)
+                reward_hist.append(total_reward)
                 plot_durations()
+                plot_rewards()
                 break
 
         if (i_episode + 1) % save_rate == 0 or i_episode == 0:
@@ -366,9 +395,15 @@ def train():
         reward_hist.append(total_reward)
 
     print('Complete')
+
     with open('reward_hist', 'wb') as f:
         pickle.dump(reward_hist, f)
+
+    with open('episode_duration_hist', 'wb') as f:
+        pickle.dump(episode_durations, f)
+
     plot_durations(show_result=True)
+    plot_rewards(show_result=True)
     plt.ioff()
     plt.show()
 
