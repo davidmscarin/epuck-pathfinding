@@ -128,7 +128,7 @@ class Environment:
         state_tensor = torch.FloatTensor(getTensor(readingsX, readingsY, N_DIV))
         return state_tensor
 
-BATCH_SIZE = 10
+BATCH_SIZE = 128
 GAMMA = 0.99
 EPS_START = 0.9
 EPS_END = 0.05
@@ -283,29 +283,45 @@ def optimize_model():
     print("Optimization complete")
 
 def train():
-    num_episodes = 500
+
+    if torch.cuda.is_available():
+        print("using cuda")
+        num_episodes = 500
+    else:
+        num_episodes = 50
 
     print(f"Running {num_episodes} episodes")
 
-    save_rate = 100
+    save_rate = 10
     reward_hist = []
 
     for i_episode in range(num_episodes):
 
+        #at the beggining of each episode reset env and get initial state
+        env.reset()
         total_reward: float = 0
+        state = env.get_state_tensor()
+        state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
         print(f"Episode {i_episode} started")
         # Initialize the environment and get its state
-        env.reset()
+
         for t in count():
-            state = env.get_state_tensor()
-            state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
-            print(f"State: {state}")
+
+            #sample action and get resulting state
+            print(f"Running episode {i_episode}")
+            print(f"Timestep {t}")
             random_action, action = select_action(state)
             action_int = action.item()
             print(f"Action: {action_int}, random: {random_action}")
             print(f"Action: {env.action_dict[action_int]}")
+
             reward, truncated, terminated = env.step(action_int)
+
+            next_state = env.get_state_tensor()
+            next_state = torch.tensor(next_state, dtype=torch.float32, device=device).unsqueeze(0)
+            print(f"Next State: {next_state}")
+
             if truncated:
                 print("Truncated")
             if terminated:
@@ -317,11 +333,8 @@ def train():
 
             if terminated:
                 next_state = None
-            else:
-                next_state = env.get_state_tensor()
-                next_state = torch.tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
 
-            # Store the transition in memory
+            # Store the transition state - action - next state - reward in memory
             memory.push(state, action, next_state, reward)
 
             # Move to the next state
@@ -348,7 +361,7 @@ def train():
                 'episode': i_episode,
                 'model_state_dict': policy_net.state_dict(),
                 'optimizer_state_dict': policy_net.state_dict(),
-            }, 'my_models/model_test_dqn_run' + str(t + 1))
+            }, 'my_models/model_test_dqn_run' + str(i_episode + 1))
 
         reward_hist.append(total_reward)
 
