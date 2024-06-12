@@ -86,7 +86,7 @@ class Environment:
             final_dist = manhattan_dist(gps, TARGET)
             return final_dist
 
-    def compute_rewards(self, system = 'Euclidean'):
+    def compute_rewards(self, system = 'Manhattan'):
         reward = 0
 
         if reached_target(self.gps, self.TARGET):
@@ -182,12 +182,12 @@ def select_action(state):
     else:
         return random_action, torch.tensor([[random.choice(env.action_space)]], device=device, dtype=torch.long)
 
-episode_durations = []
 
 
-def plot_durations(show_result=False):
+def plot_durations(data, chosen_color, show_result=False):
+
     plt.figure(1)
-    durations_t = torch.tensor(episode_durations, dtype=torch.float)
+    result_tensor = torch.tensor(data, dtype=torch.float)
     if show_result:
         plt.title('Episode Duration over Episodes')
     else:
@@ -195,12 +195,12 @@ def plot_durations(show_result=False):
         plt.title('Training...')
     plt.xlabel('Episode')
     plt.ylabel('Duration')
-    plt.plot(durations_t.numpy(), color='red')
+    plt.plot(result_tensor.numpy(), color=chosen_color)
     # Take 100 episode averages and plot them too
-    if len(durations_t) >= 100:
-        means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+    if len(result_tensor) >= 100:
+        means = result_tensor.unfold(0, 100, 1).mean(1).view(-1)
         means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy(), color='red')
+        plt.plot(means.numpy(), color=chosen_color)
 
     plt.pause(0.001)  # pause a bit so that plots are updated
     if is_ipython:
@@ -210,31 +210,6 @@ def plot_durations(show_result=False):
         else:
             display.display(plt.gcf())
 
-reward_hist = []
-def plot_rewards(show_result=False):
-    plt.figure(1)
-    rewards_t = torch.tensor(reward_hist, dtype=torch.float)
-    if show_result:
-        plt.title('Total Reward over Episodes')
-    else:
-        plt.clf()
-        plt.title('Training...')
-    plt.xlabel('Episode')
-    plt.ylabel('Total Reward')
-    plt.plot(rewards_t.numpy(), color='green')
-    # Take 100 episode averages and plot them too
-    if len(rewards_t) >= 100:
-        means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
-        means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy(), color='green')
-
-    plt.pause(0.001)  # pause a bit so that plots are updated
-    if is_ipython:
-        if not show_result:
-            display.display(plt.gcf())
-            display.clear_output(wait=True)
-        else:
-            display.display(plt.gcf())
 
 
 
@@ -314,11 +289,15 @@ def train():
         print("using cuda")
         num_episodes = 500
     else:
-        num_episodes = 50
+        num_episodes = 500
 
     print(f"Running {num_episodes} episodes")
 
-    save_rate = 10
+    save_rate = 100
+    episode_durations = []
+    reward_hist = []
+    episode_dists = []
+    dist_hist = []
 
     for i_episode in range(num_episodes):
 
@@ -354,6 +333,7 @@ def train():
             print(f"Reward: {reward}")
             reward = torch.tensor([reward], device=device)
             total_reward+=float(reward)
+            episode_dists.append(abs(reward))
             done = terminated or truncated
 
             if terminated:
@@ -381,8 +361,10 @@ def train():
             if done:
                 episode_durations.append(t + 1)
                 reward_hist.append(total_reward)
-                plot_durations()
-                plot_rewards()
+                dist_hist.append(np.average(episode_dists))
+                plot_durations(data=episode_durations, chosen_color='red')
+                plot_durations(data=reward_hist, chosen_color='green')
+                plot_durations(data=dist_hist, chosen_color='blue')
                 break
 
         if (i_episode + 1) % save_rate == 0 or i_episode == 0:
@@ -402,8 +384,9 @@ def train():
     with open('episode_duration_hist_500', 'wb') as f:
         pickle.dump(episode_durations, f)
 
-    plot_durations(show_result=True)
-    plot_rewards(show_result=True)
+    plot_durations(data=episode_durations, chosen_color='red', show_result=True)
+    plot_durations(data=reward_hist, chosen_color='green', show_result=True)
+    plot_durations(data=dist_hist, chosen_color='blue', show_result=True)
     plt.ioff()
     plt.show()
 
