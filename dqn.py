@@ -189,18 +189,18 @@ def plot_durations(show_result=False):
     plt.figure(1)
     durations_t = torch.tensor(episode_durations, dtype=torch.float)
     if show_result:
-        plt.title('Result')
+        plt.title('Episode Duration over Episodes')
     else:
         plt.clf()
         plt.title('Training...')
     plt.xlabel('Episode')
     plt.ylabel('Duration')
-    plt.plot(durations_t.numpy())
+    plt.plot(durations_t.numpy(), color='red')
     # Take 100 episode averages and plot them too
     if len(durations_t) >= 100:
         means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
         means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy())
+        plt.plot(means.numpy(), color='red')
 
     plt.pause(0.001)  # pause a bit so that plots are updated
     if is_ipython:
@@ -215,18 +215,18 @@ def plot_rewards(show_result=False):
     plt.figure(1)
     rewards_t = torch.tensor(reward_hist, dtype=torch.float)
     if show_result:
-        plt.title('Result')
+        plt.title('Total Reward over Episodes')
     else:
         plt.clf()
         plt.title('Training...')
     plt.xlabel('Episode')
     plt.ylabel('Total Reward')
-    plt.plot(rewards_t.numpy())
+    plt.plot(rewards_t.numpy(), color='green')
     # Take 100 episode averages and plot them too
     if len(rewards_t) >= 100:
         means = rewards_t.unfold(0, 100, 1).mean(1).view(-1)
         means = torch.cat((torch.zeros(99), means))
-        plt.plot(means.numpy())
+        plt.plot(means.numpy(), color='green')
 
     plt.pause(0.001)  # pause a bit so that plots are updated
     if is_ipython:
@@ -390,16 +390,16 @@ def train():
                 'episode': i_episode,
                 'model_state_dict': policy_net.state_dict(),
                 'optimizer_state_dict': policy_net.state_dict(),
-            }, 'my_models/model_test_dqn_run' + str(i_episode + 1))
+            }, 'my_models/model_test_500_dqn_run' + str(i_episode + 1))
 
         reward_hist.append(total_reward)
 
     print('Complete')
 
-    with open('reward_hist', 'wb') as f:
+    with open('reward_hist_500', 'wb') as f:
         pickle.dump(reward_hist, f)
 
-    with open('episode_duration_hist', 'wb') as f:
+    with open('episode_duration_hist_500', 'wb') as f:
         pickle.dump(episode_durations, f)
 
     plot_durations(show_result=True)
