@@ -184,17 +184,17 @@ def select_action(state):
 
 
 
-def plot_durations(data, chosen_color, show_result=False):
+def plot_durations(data, chosen_color, title, show_result=False):
 
     plt.figure(1)
     result_tensor = torch.tensor(data, dtype=torch.float)
     if show_result:
-        plt.title('Episode Duration over Episodes')
+        plt.title(title+' over Episodes')
     else:
         plt.clf()
         plt.title('Training...')
     plt.xlabel('Episode')
-    plt.ylabel('Duration')
+    plt.ylabel(title)
     plt.plot(result_tensor.numpy(), color=chosen_color)
     # Take 100 episode averages and plot them too
     if len(result_tensor) >= 100:
@@ -331,9 +331,9 @@ def train():
             if terminated:
                 print("Terminated")
             print(f"Reward: {reward}")
+            episode_dists.append(abs(reward))
             reward = torch.tensor([reward], device=device)
             total_reward+=float(reward)
-            episode_dists.append(abs(reward))
             done = terminated or truncated
 
             if terminated:
@@ -362,9 +362,9 @@ def train():
                 episode_durations.append(t + 1)
                 reward_hist.append(total_reward)
                 dist_hist.append(np.average(episode_dists))
-                plot_durations(data=episode_durations, chosen_color='red')
-                plot_durations(data=reward_hist, chosen_color='green')
-                plot_durations(data=dist_hist, chosen_color='blue')
+                plot_durations(data=episode_durations, chosen_color='red', title='Duration')
+                plot_durations(data=reward_hist, chosen_color='green', title='Reward')
+                plot_durations(data=dist_hist, chosen_color='blue', title='Average distance')
                 break
 
         if (i_episode + 1) % save_rate == 0 or i_episode == 0:
@@ -384,9 +384,9 @@ def train():
     with open('episode_duration_hist_500', 'wb') as f:
         pickle.dump(episode_durations, f)
 
-    plot_durations(data=episode_durations, chosen_color='red', show_result=True)
-    plot_durations(data=reward_hist, chosen_color='green', show_result=True)
-    plot_durations(data=dist_hist, chosen_color='blue', show_result=True)
+    plot_durations(data=episode_durations, chosen_color='red', title='Duration', show_result=True)
+    plot_durations(data=reward_hist, chosen_color='green', title='Reward', show_result=True)
+    plot_durations(data=dist_hist, chosen_color='blue', title='Average distance', show_result=True)
     plt.ioff()
     plt.show()
 
